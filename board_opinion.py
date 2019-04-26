@@ -17,7 +17,7 @@ from tempfile import mkdtemp
 class board_opinion(object):
 	def __init__(self, n_jobs = 1,time_serie = False, nbr_train_test_split = 2, scoring = "accuracy"):
 		#List of variability cleanups methods
-		self.variabilities=[(VarianceThreshold(),{'threshold':[0.,.005,.1]}),
+		self.variabilities=[(VarianceThreshold(),{'threshold':[.1]}),
 							(None,None),
 							]
 		#List of Normalizations methods
@@ -26,15 +26,15 @@ class board_opinion(object):
 								(None,None),
 								]
 		#List of Dimensions reduction methods
-		self.dim_red = [(PCA(),{'n_components':[0.3,0.6]}),
-						(FeatureAgglomeration(),{'n_clusters':[2,3]}),
-						(KMeans(),{'n_clusters':[2,3]}),
+		self.dim_red = [(PCA(),{'n_components':[0.6]}),
+						(FeatureAgglomeration(),{'n_clusters':[3]}),
+						(KMeans(),{'n_clusters':[3]}),
 						(None,None),
 						]
 		#List of clf
-		self.clf_params = [(svm.SVC(probability=True),{'C': [1], 'gamma': [1e-3], 'kernel': ['rbf']}),
+		self.clf_params = [(svm.SVC(probability=True),{'C': [1], 'gamma': [0.7], 'kernel': ['rbf']}),
 							(svm.SVC(probability=True),{'C':[1],'kernel':['linear']}),
-							(ensemble.RandomForestClassifier(),{'n_estimators':[100,300]}),
+							(ensemble.RandomForestClassifier(),{'n_estimators':[300]}),
 							(ensemble.AdaBoostClassifier(),{'base_estimator':[ensemble.RandomForestClassifier(n_estimators = 100),],'n_estimators':[100]}),
 							##(tree.DecisionTreeClassifier(),[{'criterion':["gini"]}]),	
 							(neighbors.KNeighborsClassifier(),{'n_neighbors':[7]}),
