@@ -21,5 +21,7 @@ Ensemble method:
   
   
 Filtering methods:
+
+  Performance: Select x, given number, of clfs based on performance. 
   
-  To be implemented: First will be using Cognitive Diversity Strength (as defined by Schweikert C., Gobin L., Xie S., Shimojo S., Frank Hsu D. (2018) Preference Prediction Based on Eye Movement Using Multi-layer Combinatorial Fusion. In: Wang S. et al. (eds) Brain Informatics. BI 2018. Lecture Notes in Computer Science, vol 11309. Springer, Cham)
+  To be implemented: Cognitive Diversity Strength (as defined by Schweikert C., Gobin L., Xie S., Shimojo S., Frank Hsu D. (2018) Preference Prediction Based on Eye Movement Using Multi-layer Combinatorial Fusion. In: Wang S. et al. (eds) Brain Informatics. BI 2018. Lecture Notes in Computer Science, vol 11309. Springer, Cham)
