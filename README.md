@@ -13,10 +13,13 @@ Board_opinion is class that will handle the training of a set of pipelines. It h
 
 
 Ensemble method: 
+  
   *New_mgs contains the class MGS for Mixed Group Scores handling a modified soft + beta implementation of the Mixed Group Ranks algo.
+  
   
   *For now other ensembles method are not defined here.
   
   
 Filtering methods:
+  
   To be implemented: First will be using Cognitive Diversity Strength (as defined by Schweikert C., Gobin L., Xie S., Shimojo S., Frank Hsu D. (2018) Preference Prediction Based on Eye Movement Using Multi-layer Combinatorial Fusion. In: Wang S. et al. (eds) Brain Informatics. BI 2018. Lecture Notes in Computer Science, vol 11309. Springer, Cham)
