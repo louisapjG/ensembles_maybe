@@ -1,3 +1,8 @@
+"""
+Louis Gobin
+Mixed Group Scores implementation. For references.
+Setting stage for a MGR (mixed group ranks) implementation
+"""
 import itertools
 import numpy as np
 from sklearn.metrics import accuracy_score
