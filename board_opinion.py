@@ -1,3 +1,9 @@
+"""
+Author: Louis Gobin
+board_opinion allows for the generation of all combinations of a set of normalizations, 
+variabilities, dimension_reduction, and classifiers. It performs gridsearch on the resulting sklearn pipes
+
+"""
 import numpy as np
 import copy
 import itertools
