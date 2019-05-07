@@ -1,7 +1,7 @@
 import warnings
 from sklearn import datasets
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, TimeSeriesSplit, StratifiedKFold
 from sklearn.metrics import confusion_matrix, accuracy_score, precision_score
 from voting_booth import voting_booth
 import numpy as np
@@ -9,9 +9,24 @@ import json
 import copy
 from datetime import datetime
 
+from bokeh.io import show, output_file
+from bokeh.plotting import figure
+
 from new_mgs import MGS
 from board_opinion import board_opinion as bo
-from filters import perf_filter
+from filters import perf_filter, cds_filter, ruler_filter
+
+"""
+TODO 
+	0. create cd/cds class
+	1. Create graphs for results visualization??? 1 graph per dataset? Has a spread for each type clf, and each ensemble. Bar graph for datasets
+	2. Add Filtering: CDS
+	3. Filtering read + apply other methods
+	?-1. Transform run_board_ensemble in a class
+TODO GIT:
+	1. Assess filtering methods against best initial classifier and unfiltered majority voting.
+	2. Graph of performance change when increassing the number of clf filtered
+"""
 
 
 # Print iterations progress
@@ -36,95 +51,168 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
 	if iteration == total: 
 		print()
 
-def run_board_ensemble(X,y):
+def run_board_ensemble(X,y, time_serie = False, n_splits = 5):
 	start = datetime.now()
+	
 	#Data
-	X_train, X_validation, y_train, y_validation = train_test_split(X,y)
-
-	#Models
-	# run block of code and catch warnings
-	with warnings.catch_warnings():
-		# ignore all caught warnings
-		warnings.filterwarnings("ignore")
-		board = bo(n_jobs = -1, time_serie = False, nbr_train_test_split = 3, scoring = "accuracy")
-		board = board.fit(X_train,y_train)
-		train_preds = board.predict_probas(X_train)
-		preds = board.predict_probas(X_validation)
-
-	#print("clf done",preds.shape[0])
-	clfs_acc = np.array([accuracy_score(y_validation, np.argmax(pred,axis = 1)) for pred in preds])
-
-	clf_time = datetime.now()
-	#print("CLF time",clf_time - start, preds.shape[0])
-
-	#Filter
-	filt = perf_filter(accuracy_score)
-	filt = filt.selection(y_train, train_preds)
-	train_preds = filt.filter(train_preds, nbr_to_filter = 12)
-	preds = filt.filter(preds, nbr_to_filter = 12)
+	#X_train, X_validation, y_train, y_validation = train_test_split(X,y)
+	if(time_serie):
+		splits = TimeSeriesSplit(n_splits = n_splits)
+	else:
+		splits = StratifiedKFold(n_splits = n_splits)
 
 
 	ensemble_acc_dic = {}
-	#print("MGR")
-	mgs = MGS(score_function = accuracy_score, n_jobs = -1)
-	mgs = mgs.fit(train_preds, y_train)
-	pred = mgs.predict_proba(preds)
-	ensemble_acc_dic["MGS"] = accuracy_score(y_validation, np.argmax(pred,axis = 1))
+
+	clfs_preds = []
+	best_clf = []
+
+	# mgs_preds = []
+	# maj_vote_preds = []
+	# rf_preds = []
+	#
+	mgs_preds = {'cds':[], 'ruler':[], 'perf':[]}
+	maj_vote_preds = {'cds':[], 'ruler':[], 'perf':[]}
+	rf_preds = {'cds':[], 'ruler':[], 'perf':[]}
 	
-	mgs_time = datetime.now()
-	#print("mgs",mgs_time - clf_time)
+	clfs_acc = []
 
-	#MAJ VOTING
-	#print("Maj_voting")
-	pred = voting_booth().vote(copy.deepcopy(preds))
-	ensemble_acc_dic["Maj_Voting"] = accuracy_score(y_validation, pred)
+	y_of_preds = []
+	for train, test in splits.split(X,y):
+		X_train, y_train = X[train], y[train]
+		X_validation, y_validation = X[test], y[test]
 
-	maj_vote_time = datetime.now()
-	#print("vote", maj_vote_time - mgs_time)
+		y_of_preds = y_of_preds + list(y_validation)
 
-	train_preds = np.array([x.T for x in train_preds])
-	preds = np.array([x.T for x in preds])
-	train_preds = train_preds.reshape(-1,train_preds.shape[-1])
-	preds = preds.reshape(-1,preds.shape[-1])
-	#print("Random Forest")
-	rf = RandomForestClassifier(n_estimators=100,n_jobs=-1)
-	rf = rf.fit(train_preds.T,y_train)
-	pred = rf.predict(preds.T)
-	ensemble_acc_dic["RF"] = accuracy_score(y_validation, pred)
+		#Models
+		# run block of code and catch warnings
+		with warnings.catch_warnings():
+			# ignore all caught warnings
+			warnings.filterwarnings("ignore")
+			board = bo(n_jobs = -1, time_serie = False, nbr_train_test_split = 3, scoring = "accuracy")
+			train_preds,y_trained = board.fit(X_train,y_train, predict_training_probas = True)
+			preds = board.predict_probas(X_validation)
+			if(clfs_preds == []):
+				clfs_preds = np.argmax(preds,axis = -1).tolist()
+			else:
+				for ind,pred in enumerate(preds):
+					clfs_preds[ind].extend(np.argmax(pred,axis = -1).tolist())
+		
+		clf_time = datetime.now()
+		#print("CLF time",clf_time - start, preds.shape[0])
+		filters_dico = {}
+		#Testing cds filter
+		filt = cds_filter(accuracy_score)
+		filt = filt.selection(y_trained, train_preds)
+		filters_dico["cds"] = filt
 
-	rf_time = datetime.now()
-	#print("rf",rf_time - maj_vote_time)
+		#Testing cds/perf ruling filter
+		filt = ruler_filter(accuracy_score)
+		filt = filt.selection(y_trained, train_preds)
+		filters_dico["ruler"] = filt
+
+		#Filter
+		filt = perf_filter(accuracy_score)
+		filt = filt.selection(y_trained, train_preds)
+		filters_dico["perf"] = filt
+		#Select the best clf at training and record it's testing scores
+		best_pred = filt.filter(preds, nbr_to_filter = 1)
+		best_clf.extend(np.argmax(best_pred[0], axis = 1))
+
+		#For each filter
+		for filter_name in filters_dico:
+			#Do
+			train_preds_filtered = filt.filter(train_preds, nbr_to_filter = 12)
+			preds_filtered = filt.filter(preds, nbr_to_filter = 12)
+			
+			#MGS
+			#print("MGS")
+			mgs = MGS(score_function = accuracy_score, n_jobs = -1)
+			mgs = mgs.fit(train_preds_filtered, y_trained)
+			pred = mgs.predict_proba(preds_filtered)
+			#mgs_preds.extend(np.argmax(pred, axis = 1).tolist())
+			mgs_preds[filter_name].extend(np.argmax(pred, axis = 1).tolist())
+			
+			mgs_time = datetime.now()
+			#print("mgs",mgs_time - clf_time)
+
+			#MAJ VOTING
+			#print("Maj_voting")
+			pred = voting_booth().vote(copy.deepcopy(preds_filtered))
+			#maj_vote_preds.extend(pred.tolist())
+			maj_vote_preds[filter_name].extend(pred.tolist())
+
+			maj_vote_time = datetime.now()
+			#print("vote", maj_vote_time - mgs_time)
+
+			#RANDOM FOREST
+			train_preds_filtered = np.array([x.T for x in train_preds_filtered])
+			preds_filtered = np.array([x.T for x in preds_filtered])
+			train_preds_filtered = train_preds_filtered.reshape(-1,train_preds_filtered.shape[-1])
+			preds_filtered = preds_filtered.reshape(-1,preds_filtered.shape[-1])
+			#print("Random Forest")
+			rf = RandomForestClassifier(n_estimators=100,n_jobs=-1)
+			rf = rf.fit(train_preds_filtered.T,y_trained)
+			pred = rf.predict(preds_filtered.T)
+			#rf_preds.extend(pred.tolist())
+			rf_preds[filter_name].extend(pred.tolist())
+		#rf_time = datetime.now()
+
+	ensemble_acc_dic["Best_clf"] = accuracy_score(y_of_preds,best_clf)
+	for filter_name in mgs_preds:
+		ensemble_acc_dic["MGS_"+filter_name] = accuracy_score(y_of_preds, mgs_preds[filter_name])
+		ensemble_acc_dic["Maj_Voting_"+filter_name] = accuracy_score(y_of_preds, maj_vote_preds[filter_name])
+		ensemble_acc_dic["RF_"+filter_name] = accuracy_score(y_of_preds, rf_preds[filter_name])
+
+	clfs_acc = np.array([accuracy_score(y_of_preds, pred) for pred in clfs_preds])
 
 	return clfs_acc, ensemble_acc_dic
 
 def main():
-	nbr_iterations = 10
-	clf_min, clf_max, clf_median, clf_avg = [],[],[],[]
-	rf, mgs, maj_vote = [], [], []
-	iris = datasets.load_iris()
+	nbr_iterations = 3
+	#rf, mgs, maj_vote, best_clf = [], [], [], []
+	ensembles_results = {}
+	iris = datasets.load_iris()#load_digits()#
+	output_file_name = "stats_results_iris.txt" # "stats_results_digits.txt"#
 	X = iris.data
 	y = iris.target
+	
 	for n in range(nbr_iterations):
-		clfs, ensembles_dico = run_board_ensemble(X,y)
-		clf_min.append(clfs.min())
-		clf_max.append(clfs.max())
-		clf_median.append(np.median(clfs))
-		clf_avg.append(np.average(clfs))
-		rf.append(ensembles_dico["RF"])
-		mgs.append(ensembles_dico["MGS"])
-		maj_vote.append(ensembles_dico["Maj_Voting"])
+		clfs, ensembles_dico = run_board_ensemble(X,y, time_serie = False, n_splits = 3)
+		#best_clf.append(ensembles_dico["best_clf"])
+		for key in ensembles_dico:
+			if key in ensembles_results:
+				ensembles_results[key].extend([ensembles_dico[key]])
+			else:
+				ensembles_results[key] = [ensembles_dico[key]]
+
+		# rf.append(ensembles_dico["RF"])
+		# mgs.append(ensembles_dico["MGS"])
+		# maj_vote.append(ensembles_dico["Maj_Voting"])
 
 		printProgressBar(n,nbr_iterations)
 
-	with open("stats_results.txt", 'a') as f:
-	    f.write('min: ' + str(np.average(clf_min)) + '\n')
-	    f.write('max: ' + str(np.average(clf_max)) + '\n')
-	    f.write('avg: ' + str(np.average(clf_avg)) + '\n')
-	    f.write('med: ' + str(np.average(clf_median)) + '\n')
-	    f.write("MGS: " + str(np.average(mgs)) + '\n')
-	    f.write("Majority Voting: " + str(np.average(maj_vote)) + '\n')
-	    f.write('Random Forest: ' + str(np.average(rf)) + '\n')
-	    f.write('\n')
+	with open(output_file_name, 'a') as f:
+		#f.write("Best_clf: " + str(np.average(best_clf)) + '\n')
+		for key in ensembles_results:
+			f.write(key + ": " + str(np.average(ensembles_results[key])) + '\n')
+		    # f.write("Majority Voting: " + str(np.average(maj_vote)) + '\n')
+		    # f.write('Random Forest: ' + str(np.average(rf)) + '\n')
+		f.write('\n')
+
+	#Graph bokeh
+	output_file("bar_sorted.html")
+	values = [np.average(ensembles_results[key]) for key in ensembles_results]
+	col_names = [key  for key in ensembles_results]
+	sorted_names = sorted(col_names, key=lambda x: values[col_names.index(x)])
+	p = figure(x_range=sorted_names, plot_height=350, title="Ensembles performances", toolbar_location=None, tools="hover", tooltips="$name @col_names: @$name")
+	p.vbar(x=col_names, top=values, width=0.9)
+	p.xgrid.grid_line_color = None
+	p.y_range.start = 0
+	show(p)
+
 
 
 main()
+
+#
