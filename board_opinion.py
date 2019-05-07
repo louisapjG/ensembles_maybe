@@ -8,7 +8,7 @@ from sklearn import svm, ensemble, linear_model, naive_bayes, discriminant_analy
 from sklearn.cluster import KMeans, FeatureAgglomeration
 from sklearn.decomposition import PCA
 from sklearn.feature_selection import VarianceThreshold
-from sklearn.model_selection import train_test_split, GridSearchCV, TimeSeriesSplit
+from sklearn.model_selection import train_test_split, GridSearchCV, TimeSeriesSplit, StratifiedKFold
 from sklearn.metrics import accuracy_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
@@ -56,7 +56,7 @@ class board_opinion(object):
 		self.nbr_train_test_split = nbr_train_test_split
 		self.scoring = scoring
 
-	def fit(self,data_in,data_target):
+	def fit(self,data_in,data_target, predict_training_probas = False):
 		#SPLIT INTO DATA_IN_/DATA_TARGET_ AND DATA_TEST AND TEST_TARGET
 		list_returned=[]
 		#List all combinations of options of opinions
@@ -67,19 +67,27 @@ class board_opinion(object):
 			for c,combination in enumerate(opinions_combinations_options):
 				list_returned.append(self.multi_fit(c,combination,data_in,data_target))
 		else:
-			list_returned=Parallel(n_jobs=self.n_jobs,verbose=0)(delayed (self.multi_fit)(c,combination,data_in,data_target) for c,combination in enumerate(opinions_combinations_options))
+			list_returned=Parallel(n_jobs=self.n_jobs,verbose=0)(delayed (self.multi_fit)(c,combination,data_in,data_target, predict_training_probas) for c,combination in enumerate(opinions_combinations_options))
 
 		best_opinion_acc=0
+		training_probas = {}
 		for ret in list_returned:
 			c=ret[0]
 			self.opinions_acc[c]=ret[1]
 			self.opinions_algos[c]=ret[2]
 			if(self.opinions_acc[c]>best_opinion_acc):
 				best_opinion_acc=self.opinions_acc[c]
+			if(predict_training_probas):
+				training_probas[c] = ret[3]
+				ys = ret[4]
+		
+		if(predict_training_probas):
+			training_probas_lst = [training_probas[key] for key in sorted(training_probas.keys())]
+			return np.array(training_probas_lst), np.array(ys)
+		else:
+			return self
 
-		return self
-
-	def multi_fit(self,c,combination,data_in,data_target):
+	def multi_fit(self,c,combination,data_in,data_target, predict_training_probas = False):
 		#Train all opinions (get scores, acc)
 		cc = combination[3]
 		clf,clf_params = cc[0],cc[1]
@@ -171,17 +179,36 @@ class board_opinion(object):
 		pipe=pipe.fit(data_in,data_target)
 
 		rmtree(cachedir)
-		return c,pipe.best_score_,pipe
+
+		#Return training preds
+		if(predict_training_probas):
+			#Split data in repeatable pattern
+			if(self.time_serie):
+				splitter = TimeSeriesSplit(n_splits = self.nbr_train_test_split)
+			else:
+				splitter = StratifiedKFold(n_splits = self.nbr_train_test_split, random_state = 13)
+			preds = []
+			ys = []
+			for train, test in splitter.split(data_in,data_target):
+				X_train, y_train = data_in[train], data_target[train]
+				X_test, y_test = data_in[test], data_target[test]
+				retrained_est = pipe.best_estimator_.fit(X_train,y_train)
+				preds.extend(retrained_est.predict_proba(X_test))
+				ys.extend(y_test)
+
+			return c,pipe.best_score_,pipe,preds,ys
+		else:
+			return c,pipe.best_score_,pipe
 
 	def predict_probas(self,data_in):
 		#Apply opinion
 		scores = {}
-		for key in self.opinions_algos:
+		for key in sorted(self.opinions_algos.keys()):
 			op=self.opinions_algos[key]
 			scores[key]=op.predict_proba(data_in)
 
 		x=np.array([scores[a] for a in scores])
 		
 		return x
-		
+	
 #
