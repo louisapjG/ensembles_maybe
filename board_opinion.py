@@ -1,9 +1,3 @@
-"""
-Author: Louis Gobin
-board_opinion allows for the generation of all combinations of a set of normalizations, 
-variabilities, dimension_reduction, and classifiers. It performs gridsearch on the resulting sklearn pipes
-
-"""
 import numpy as np
 import copy
 import itertools
@@ -21,37 +15,45 @@ from sklearn.preprocessing import MinMaxScaler
 from tempfile import mkdtemp
 
 class board_opinion(object):
-	def __init__(self, n_jobs = 1,time_serie = False, nbr_train_test_split = 2, scoring = "accuracy"):
+	def __init__(self, n_jobs = 1,time_serie = False, nbr_train_test_split = 2, scoring = "accuracy", variabilities = [(None,None)], normalizations = [(None,None)], dim_red = [(None,None)], clf_params = [(ensemble.RandomForestClassifier(),{'n_estimators':[300]}),]):
 		#List of variability cleanups methods
-		self.variabilities=[(VarianceThreshold(),{'threshold':[.1]}),
-							(None,None),
-							]
+		# self.variabilities=[(VarianceThreshold(),{'threshold':[.1]}),
+		# 					(None,None),
+		# 					]
+		self.variabilities = variabilities
+
+
 		#List of Normalizations methods
 		#normalizations=['MinMaxScaler','None']
-		self.normalizations = [(MinMaxScaler(),{'feature_range':[(0, 1)]}),
-								(None,None),
-								]
+		# self.normalizations = [(MinMaxScaler(),{'feature_range':[(0, 1)]}),
+		# 						(None,None),
+		# 						]
+		self.normalizations = normalizations
+		
 		#List of Dimensions reduction methods
-		self.dim_red = [(PCA(),{'n_components':[0.6]}),
-						(FeatureAgglomeration(),{'n_clusters':[3]}),
-						(KMeans(),{'n_clusters':[3]}),
-						(None,None),
-						]
+		# self.dim_red = [(PCA(),{'n_components':[0.6]}),
+		# 				(FeatureAgglomeration(),{'n_clusters':[3]}),
+		# 				(KMeans(),{'n_clusters':[3]}),
+		# 				(None,None),
+		# 				]
+		self.dim_red = dim_red
+		
 		#List of clf
-		self.clf_params = [(svm.SVC(probability=True),{'C': [1], 'gamma': [0.7], 'kernel': ['rbf']}),
-							(svm.SVC(probability=True),{'C':[1],'kernel':['linear']}),
-							(ensemble.RandomForestClassifier(),{'n_estimators':[300]}),
-							(ensemble.AdaBoostClassifier(),{'base_estimator':[ensemble.RandomForestClassifier(n_estimators = 100),],'n_estimators':[100]}),
-							##(tree.DecisionTreeClassifier(),[{'criterion':["gini"]}]),	
-							(neighbors.KNeighborsClassifier(),{'n_neighbors':[7]}),
-							#MCONSUMPTION ON LARGET SETS(gaussian_process.GaussianProcessClassifier(),[{'random_state':[3]}]),
-							(ensemble.GradientBoostingClassifier(),{'loss':['deviance'],'n_estimators':[200],'max_depth':[4]}),
-							(ensemble.ExtraTreesClassifier(),{'n_estimators':[50]}),
-							##(naive_bayes.GaussianNB(),[{'priors':[None]}]),
-							#Linear classifier
-							#Naive Bayes
-							#Decision tree
-							]
+		# self.clf_params = [(svm.SVC(probability=True),{'C': [1], 'gamma': [0.7], 'kernel': ['rbf']}),
+		# 					(svm.SVC(probability=True),{'C':[1],'kernel':['linear']}),
+		# 					(ensemble.RandomForestClassifier(),{'n_estimators':[300]}),
+		# 					(ensemble.AdaBoostClassifier(),{'base_estimator':[ensemble.RandomForestClassifier(n_estimators = 100),],'n_estimators':[100]}),
+		# 					##(tree.DecisionTreeClassifier(),[{'criterion':["gini"]}]),	
+		# 					(neighbors.KNeighborsClassifier(),{'n_neighbors':[7]}),
+		# 					#MCONSUMPTION ON LARGET SETS(gaussian_process.GaussianProcessClassifier(),[{'random_state':[3]}]),
+		# 					(ensemble.GradientBoostingClassifier(),{'loss':['deviance'],'n_estimators':[200],'max_depth':[4]}),
+		# 					(ensemble.ExtraTreesClassifier(),{'n_estimators':[50]}),
+		# 					##(naive_bayes.GaussianNB(),[{'priors':[None]}]),
+		# 					#Linear classifier
+		# 					#Naive Bayes
+		# 					#Decision tree
+		# 					]
+		self.clf_params = clf_params
 
 		#Dico of scores by opinions:
 		self.opinions_acc={}
