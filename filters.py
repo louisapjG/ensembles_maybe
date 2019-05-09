@@ -1,11 +1,3 @@
-"""
-Author: Louis Gobin
-A set of classes used for filtering. The classes that will probably be called by 
-user (as of May 5 2019) are perf_filter, cds_filter and ruler filter. 
-perf_filter selects the X best performing classifiers
-cds: uses cognitive diversity and cognitive diversity strength to select the X most diverse classifiers
-ruler_filter: select the X best common elements between perf and cds classifiers.
-"""
 import numpy as np
 from numba import jit
 from sklearn.metrics import accuracy_score
