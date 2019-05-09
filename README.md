@@ -24,3 +24,6 @@ Filtering methods:
   Performance: Select x, given number, of clfs based on performance. 
   CDS: Cognitive Diversity Strength as defined in "Preference Prediction Based on Eye Movement Using Multi-layer Combinatorial Fusion".
   Sliding Ruler: Ranks by performance a separately by CDS before selecting the X highest common to both.
+
+Example of a simple output graph summary:
+![alt text](https://github.com/louisapjG/ml_toolbox/blob/master/Screen%20Shot%202019-05-09%20at%2012.34.44.png)
