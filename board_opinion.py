@@ -75,7 +75,7 @@ class board_opinion(object):
 			for c,combination in enumerate(opinions_combinations_options):
 				list_returned.append(self.multi_fit(c,combination,data_in,data_target))
 		else:
-			list_returned=Parallel(n_jobs=self.n_jobs,verbose=0)(delayed (self.multi_fit)(c,combination,data_in,data_target, predict_training_probas) for c,combination in enumerate(opinions_combinations_options))
+			list_returned=Parallel(n_jobs=self.n_jobs, backend="threading", verbose=0, max_nbytes=1e4)(delayed (self.multi_fit)(c,combination,data_in,data_target, predict_training_probas) for c,combination in enumerate(opinions_combinations_options))
 
 		best_opinion_acc=0
 		training_probas = {}
