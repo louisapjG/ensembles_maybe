@@ -106,8 +106,8 @@ class board_opinion(object):
 		dim_red = combination[2]
 		dim_red,dim_red_params = dim_red[0], dim_red[1]
 
-		cachedir = mkdtemp()
-		memory = Memory(cachedir=cachedir, verbose=0)
+		# cachedir = mkdtemp()
+		# memory = Memory(cachedir=cachedir, verbose=0)
 		
 		#Define pipeline
 		#No norm + var + dim red
@@ -121,7 +121,9 @@ class board_opinion(object):
 			pipe = Pipeline(steps = [
 									('dim_red',dim_red),
 									('clf',clf)
-									],memory = memory)
+									],
+									#memory = memory
+									)
 			param_grid = {'clf__'+k:clf_params[k] for k in clf_params}
 			param_grid.update({'dim_red__'+k:dim_red_params[k] for k in dim_red_params})
 		#No var + dim red
@@ -129,14 +131,19 @@ class board_opinion(object):
 			pipe = Pipeline(steps = [
 									('norm',norm),
 									('clf',clf)
-									],memory = memory)
+									],
+									#memory = memory
+									)
 			param_grid = {'clf__'+k:clf_params[k] for k in clf_params}
 			param_grid.update({'norm__'+k:norm_params[k] for k in norm_params})
 		#No norm + dim red
 		elif(norm == None and dim_red == None):
-			pipe = Pipeline(steps = [('var',var),
+			pipe = Pipeline(steps = [
+									('var',var),
 									('clf',clf)
-									], memory = memory)
+									], 
+									#memory = memory
+									)
 			param_grid = {'clf__'+k:clf_params[k] for k in clf_params}
 			param_grid.update({'var__'+k:var_params[k] for k in var_params})
 		#No var
@@ -145,35 +152,46 @@ class board_opinion(object):
 									('norm',norm),
 									('dim_red',dim_red),
 									('clf',clf)
-									], memory = memory)
+									], 
+									#memory = memory
+									)
 			param_grid = {'clf__'+k:clf_params[k] for k in clf_params}
 			param_grid.update({'dim_red__'+k:dim_red_params[k] for k in dim_red_params})
 			param_grid.update({'norm__'+k:norm_params[k] for k in norm_params})
 		#No norm
 		elif norm == None:
-			pipe = Pipeline(steps = [('var',var),
+			pipe = Pipeline(steps = [
+									('var',var),
 									('dim_red',dim_red),
 									('clf',clf)
-									], memory = memory)
+									], 
+									#memory = memory
+									)
 			param_grid = {'clf__'+k:clf_params[k] for k in clf_params}
 			param_grid.update({'dim_red__'+k:dim_red_params[k] for k in dim_red_params})
 			param_grid.update({'var__'+k:var_params[k] for k in var_params})
 		#No dim red
 		elif dim_red == None:
-			pipe = Pipeline(steps = [('var',var),
+			pipe = Pipeline(steps = [
+									('var',var),
 									('norm',norm),
 									('clf',clf)
-									], memory = memory)
+									], 
+									#memory = memory
+									)
 			param_grid = {'clf__'+k:clf_params[k] for k in clf_params}
 			param_grid.update({'norm__'+k:norm_params[k] for k in norm_params})
 			param_grid.update({'var__'+k:var_params[k] for k in var_params})
 		#All in
 		else:
-			pipe = Pipeline(steps = [('var',var),
+			pipe = Pipeline(steps = [
+									('var',var),
 									('norm',norm),
 									('dim_red',dim_red),
 									('clf',clf)
-									], memory = memory)
+									], 
+									#memory = memory
+									)
 			param_grid = {'clf__'+k:clf_params[k] for k in clf_params}
 			param_grid.update({'dim_red__'+k:dim_red_params[k] for k in dim_red_params})
 			param_grid.update({'norm__'+k:norm_params[k] for k in norm_params})
@@ -186,7 +204,7 @@ class board_opinion(object):
 			pipe = GridSearchCV(pipe, param_grid, scoring = self.scoring, cv = self.nbr_train_test_split, return_train_score = False)
 		pipe=pipe.fit(data_in,data_target)
 
-		rmtree(cachedir)
+		# rmtree(cachedir)
 
 		#Return training preds
 		if(predict_training_probas):
