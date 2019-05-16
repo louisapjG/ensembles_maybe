@@ -1,4 +1,3 @@
-#https://app.scholarjet.com/challenges/Xxj
 import warnings
 from sklearn import datasets
 from sklearn.ensemble import RandomForestClassifier
@@ -294,7 +293,7 @@ def main():
 						#Decision tree
 						],
 		#n_jobs
-		"n_jobs" : -1
+		"n_jobs" : -2
 	}
 	
 	ensembles_results = {}
