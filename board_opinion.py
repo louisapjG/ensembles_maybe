@@ -96,16 +96,23 @@ class board_opinion(object):
 		else:
 			return self
 
-	def multi_fit(self,c,combination,data_in,data_target, predict_training_probas = False):
+	def multi_fit(self, c, combination, data_in, data_target, predict_training_probas = False):
 		start = datetime.now()
 		#Train all opinions (get scores, acc)
-		cc = combination[3]
+		clf_name = combination[3]
+		cc = self.clf_params[clf_name]
 		clf,clf_params = cc[0],cc[1]
-		var = combination[0]
+		
+		var_name = combination[0]
+		var = self.variabilities[var_name]
 		var,var_params = var[0],var[1]
-		norm = combination[1]
+		
+		norm_name = combination[1]
+		norm = self.normalizations[norm_name]
 		norm,norm_params = norm[0],norm[1]
-		dim_red = combination[2]
+		
+		dim_red_name = combination[2]
+		dim_red = self.dim_red[dim_red_name]
 		dim_red,dim_red_params = dim_red[0], dim_red[1]
 
 		# print(dim_red)
@@ -213,6 +220,7 @@ class board_opinion(object):
 		pipe=pipe.fit(data_in,data_target)
 		# rmtree(cachedir)
 
+		combination_name = norm_name + "__" + var_name + "__" + dim_red_name + "__" + clf_name
 		#Return training preds
 		if(predict_training_probas):
 			#Split data in repeatable pattern
@@ -232,10 +240,10 @@ class board_opinion(object):
 				# print(datetime.now() - start)
 				# print()
 
-			return c,pipe.best_score_,pipe,preds,ys
+			return combination_name,pipe.best_score_,pipe,preds,ys
 		
 		else:
-			return c,pipe.best_score_,pipe
+			return combination_name,pipe.best_score_,pipe
 
 	def predict_probas(self,data_in):
 		#Apply opinion
