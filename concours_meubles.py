@@ -9,7 +9,6 @@ from sklearn.decomposition import PCA
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.preprocessing import MinMaxScaler
 
-from voting_booth import voting_booth
 import numpy as np
 import json
 import copy
@@ -20,11 +19,14 @@ from bokeh.plotting import figure, output_file, show, ColumnDataSource
 from bokeh.models import LabelSet, ranges
 from bokeh.palettes import PuBu
 
+
 from new_mgs import MGS
 from board_opinion import board_opinion as bo
 from filters import perf_filter, cds_filter, ruler_filter
+from voting_booth import voting_booth
 
 import pandas as pd
+from imblearn.combine import SMOTETomek
 
 # Print iterations progress
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '█'):
@@ -48,7 +50,7 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
 	if iteration == total: 
 		print()
 
-def run_board_ensemble(X,y, dic_params_board, time_serie = False, n_splits = 5, nbr_train_test_split = 3, nbr_to_filter = 12, performance = accuracy_score):
+def run_board_ensemble(X,y, dic_params_board, time_serie = False, n_splits = 5, nbr_train_test_split = 3, nbr_to_filter = 12, performance = accuracy_score, smt_ratio = "auto"):
 	performance_sk = make_scorer(performance)
 	start = datetime.now()
 
@@ -84,8 +86,13 @@ def run_board_ensemble(X,y, dic_params_board, time_serie = False, n_splits = 5, 
 
 		y_of_preds = y_of_preds + list(y_validation)
 
+		# SMOTETomek
+		smt = SMOTETomek(ratio = smt_ratio)
+		X_train, y_train = smt.fit_sample(X_train, y_train)
+
 		#Models
 		# run block of code and catch warnings
+		start_clf = datetime.now()
 		try:
 			with warnings.catch_warnings():
 				# ignore all caught warnings
@@ -102,21 +109,21 @@ def run_board_ensemble(X,y, dic_params_board, time_serie = False, n_splits = 5, 
 			continue
 		
 		clf_time = datetime.now()
-		print("CLF time",clf_time - start, preds.shape[0])
+		#print("CLF time",clf_time - start_clf, preds.shape[0])
 		filters_dico = {}
 		#Testing cds filter
 		filt = cds_filter(performance)
 		filt = filt.selection(y_trained, train_preds)
 		filters_dico["cds"] = filt
 		cds_time = datetime.now()
-		print("cds time", cds_time - clf_time)
+		#print("cds time", cds_time - clf_time)
 
 		#Testing cds/perf ruling filter
 		filt = ruler_filter(performance)
 		filt = filt.selection(y_trained, train_preds)
 		filters_dico["ruler"] = filt
 		ruler_time = datetime.now()
-		print("ruler time", ruler_time - cds_time)
+		#print("ruler time", ruler_time - cds_time)
 
 		#Filter
 		filt = perf_filter(performance)
@@ -126,7 +133,7 @@ def run_board_ensemble(X,y, dic_params_board, time_serie = False, n_splits = 5, 
 		best_pred = filt.filter(preds, nbr_to_filter = 1)
 		best_clf.extend(np.argmax(best_pred[0], axis = 1))
 		best_time = datetime.now()
-		print("best clf time", best_time - ruler_time)
+		#print("best clf time", best_time - ruler_time)
 
 		#For each filter
 		for filter_name in filters_dico:
@@ -225,12 +232,9 @@ def display_results(results):
 
 def import_data(path):
 	df = pd.read_csv(path)
-
 	df = df.fillna(0)
-
 	df_target = df[["cuid","convert_30","revenue_30"]]
 	df = df.drop(["convert_30","revenue_30",'Unnamed: 0'], axis = 1)
-
 	#Set all columns types object to categorical
 	cat_columns = df.select_dtypes(['object']).columns
 	#df[cat_columns] = df[cat_columns].apply(lambda x: x.astype('category').cat.codes.astype('category'))
@@ -244,64 +248,88 @@ def import_data(path):
 	return df, df_target
 
 def main():
-	nbr_iterations = 5
+	nbr_iterations = 1
 	n_splits = 3
 	nbr_train_test_split = 5
 	nbr_to_filter = 12
 
-	performance = accuracy_score
+	performance = accuracy_score # precision_score
 	output_file_name = "stats_results_wayfair.txt"#"stats_results_iris.txt" # 
 	#Get data
-	X, y_two = import_data("/Users/Louis/Desktop/code/ensembles/applications/df_training_scholarjet.csv")
+	X, y_two = import_data("applications/df_training_scholarjet.csv")
 	#ONLY DOES CATEGORICAL
 	y = y_two.drop( "revenue_30", axis = 1)
+	X, y = X.values, np.ravel(y.values)
 
-	X, y = X.values, y.values
+	smt_ratio = .25
 
 	dic_params_board = {
 		#List of variability cleanups methods
-		"variabilities" : [
-							#(VarianceThreshold(),{'threshold':[.1]}),
-							(VarianceThreshold(),{'threshold':[.0]}),
+		"variabilities" : {
+							"var" : (VarianceThreshold(),{'threshold':[.9*0.1,0.]}),
 							#(None,None),
-						],
+						},
 
 		#List of Normalizations methods
-		"normalizations" : [
-								(MinMaxScaler(),{'feature_range':[(0, 1)]}),
+		# "normalizations" : [
+		# 						(MinMaxScaler(),{'feature_range':[(0, 1)]}),
+		# 						#(None,None),
+		# 					],
+		"normalizations" : {
+								"minmax" : (MinMaxScaler(),{'feature_range':[(0, 1)]}),
 								#(None,None),
-							],
+							},
 		
 		#List of Dimensions reduction methods
-		"dim_red" : [
-						(PCA(),{'n_components':[0.25,0.1]}),
+		# "dim_red" : [
+		# 				(PCA(),{'n_components':[0.25,0.1]}),
+		# 				#(FeatureAgglomeration(),{'n_clusters':[30,10]}),
+		# 				#(KMeans(),{'n_clusters':[10,30]}),
+		# 				#(None,None),
+		# 			],
+		"dim_red" : {
+						"PCA" : (PCA(),{'n_components':[0.25,0.1]}),
 						#(FeatureAgglomeration(),{'n_clusters':[30,10]}),
-						(KMeans(),{'n_clusters':[10,30]}),
+						#(KMeans(),{'n_clusters':[10,30]}),
 						#(None,None),
-					],
-		
+					},
+
 		#List of clf
-		"clf_params" : [(svm.SVC(probability=True),{'C': [1], 'gamma': [0.7], 'kernel': ['rbf']}),
-						(svm.SVC(probability=True),{'C':[1],'kernel':['linear']}),
-						#(ensemble.RandomForestClassifier(),{'n_estimators':[300]}),
-						(ensemble.AdaBoostClassifier(),{'base_estimator':[ensemble.RandomForestClassifier(n_estimators = 150),],'n_estimators':[100]}),
+		# "clf_params" : [(svm.SVC(probability=True),{'C': [1], 'gamma': [0.7], 'kernel': ['rbf']}),
+		# 				(svm.SVC(probability=True),{'C':[1e-1, 1, 1e1],'kernel':['linear']}),
+		# 				# (ensemble.RandomForestClassifier(),{'n_estimators':[300]}),
+		# 				# (ensemble.AdaBoostClassifier(),{'base_estimator':[ensemble.RandomForestClassifier(n_estimators = 150),],'n_estimators':[100]}),
+		# 				#(tree.DecisionTreeClassifier(),{'criterion':["gini"]}),	
+		# 				#(neighbors.KNeighborsClassifier(),{'n_neighbors':[7]}),
+		# 				#MCONSUMPTION ON LARGET SETS(gaussian_process.GaussianProcessClassifier(),[{'random_state':[3]}]),
+		# 				# (ensemble.GradientBoostingClassifier(),{'loss':['deviance'],'n_estimators':[200,100,300],'max_depth':[2,4,6]}),
+		# 				# (ensemble.ExtraTreesClassifier(),{'n_estimators':[50,100,200,300]}),
+		# 				##(naive_bayes.GaussianNB(),[{'priors':[None]}]),
+		# 				#Linear classifier
+		# 				#Naive Bayes
+		# 				#Decision tree
+		# 				],
+		"clf_params" : {"svm_rbf":(svm.SVC(probability=True),{'C': [1], 'gamma': [0.7], 'kernel': ['rbf']}),
+						"svm_linear":(svm.SVC(probability=True),{'C':[1e-1, 1, 1e1],'kernel':['linear']}),
+						# (ensemble.RandomForestClassifier(),{'n_estimators':[300]}),
+						# (ensemble.AdaBoostClassifier(),{'base_estimator':[ensemble.RandomForestClassifier(n_estimators = 150),],'n_estimators':[100]}),
 						#(tree.DecisionTreeClassifier(),{'criterion':["gini"]}),	
 						#(neighbors.KNeighborsClassifier(),{'n_neighbors':[7]}),
 						#MCONSUMPTION ON LARGET SETS(gaussian_process.GaussianProcessClassifier(),[{'random_state':[3]}]),
-						(ensemble.GradientBoostingClassifier(),{'loss':['deviance'],'n_estimators':[200],'max_depth':[3]}),#(ensemble.GradientBoostingClassifier(),{'loss':['deviance'],'n_estimators':[200,100,300],'max_depth':[2,4,6]}),
-						(ensemble.ExtraTreesClassifier(),{'n_estimators':[200]}),#(ensemble.ExtraTreesClassifier(),{'n_estimators':[50,100,200,300]}),
+						# (ensemble.GradientBoostingClassifier(),{'loss':['deviance'],'n_estimators':[200,100,300],'max_depth':[2,4,6]}),
+						# (ensemble.ExtraTreesClassifier(),{'n_estimators':[50,100,200,300]}),
 						##(naive_bayes.GaussianNB(),[{'priors':[None]}]),
 						#Linear classifier
 						#Naive Bayes
 						#Decision tree
-						],
+						},
 		#n_jobs
-		"n_jobs" : -2
+		"n_jobs" : -1
 	}
 	
 	ensembles_results = {}
 	for n in range(nbr_iterations):
-		clfs, ensembles_dico = run_board_ensemble(X,y, time_serie = False, n_splits = n_splits, nbr_train_test_split = nbr_train_test_split, nbr_to_filter = nbr_to_filter, performance = performance, dic_params_board = dic_params_board)
+		clfs, ensembles_dico = run_board_ensemble(X,y, time_serie = False, n_splits = n_splits, nbr_train_test_split = nbr_train_test_split, nbr_to_filter = nbr_to_filter, performance = performance, dic_params_board = dic_params_board, smt_ratio = smt_ratio)
 		for key in ensembles_dico:
 			if key in ensembles_results:
 				ensembles_results[key].extend([ensembles_dico[key]])
@@ -317,7 +345,7 @@ def main():
 
 	
 	averaged_results = {key:np.average(ensembles_results[key]) for key in ensembles_results}
-
+	print(datetime.now())
 	#Graph bokeh
 	display_results(averaged_results)
 
