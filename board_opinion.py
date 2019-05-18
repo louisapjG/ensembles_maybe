@@ -73,9 +73,10 @@ class board_opinion(object):
 		if(self.n_jobs==1):
 			#For all combinations:
 			for c,combination in enumerate(opinions_combinations_options):
-				list_returned.append(self.multi_fit(c,combination,data_in,data_target))
+				list_returned.append(self.multi_fit(c,combination,data_in,data_target, predict_training_probas))
 		else:
-			list_returned=Parallel(n_jobs=self.n_jobs, backend="threading", verbose=0, max_nbytes=1e4)(delayed (self.multi_fit)(c,combination,data_in,data_target, predict_training_probas) for c,combination in enumerate(opinions_combinations_options))
+			#"multiprocessing" "threading"
+			list_returned=Parallel(n_jobs=self.n_jobs, verbose=0, max_nbytes=1e4)(delayed (self.multi_fit)(c,combination,data_in,data_target, predict_training_probas) for c,combination in enumerate(opinions_combinations_options))
 
 		best_opinion_acc=0
 		training_probas = {}
@@ -88,7 +89,7 @@ class board_opinion(object):
 			if(predict_training_probas):
 				training_probas[c] = ret[3]
 				ys = ret[4]
-		
+
 		if(predict_training_probas):
 			training_probas_lst = [training_probas[key] for key in sorted(training_probas.keys())]
 			return np.array(training_probas_lst), np.array(ys)
@@ -96,6 +97,7 @@ class board_opinion(object):
 			return self
 
 	def multi_fit(self,c,combination,data_in,data_target, predict_training_probas = False):
+		start = datetime.now()
 		#Train all opinions (get scores, acc)
 		cc = combination[3]
 		clf,clf_params = cc[0],cc[1]
@@ -106,15 +108,21 @@ class board_opinion(object):
 		dim_red = combination[2]
 		dim_red,dim_red_params = dim_red[0], dim_red[1]
 
+		# print(dim_red)
+		# print(norm)
+		# print(var)
+		# print(clf)
+
 		# cachedir = mkdtemp()
 		# memory = Memory(cachedir=cachedir, verbose=0)
-		
 		#Define pipeline
 		#No norm + var + dim red
 		if(var == None and norm == None and dim_red == None):
 			pipe = Pipeline(steps = [
 									('clf',clf)
-									],memory = memory)
+									],
+									#memory = memory
+									)
 			param_grid = {'clf__'+k:clf_params[k] for k in clf_params}
 		#No var + norm
 		elif(var == None and norm == None):
@@ -203,7 +211,6 @@ class board_opinion(object):
 		else:
 			pipe = GridSearchCV(pipe, param_grid, scoring = self.scoring, cv = self.nbr_train_test_split, return_train_score = False)
 		pipe=pipe.fit(data_in,data_target)
-
 		# rmtree(cachedir)
 
 		#Return training preds
@@ -222,7 +229,11 @@ class board_opinion(object):
 				preds.extend(retrained_est.predict_proba(X_test))
 				ys.extend(y_test)
 
+				# print(datetime.now() - start)
+				# print()
+
 			return c,pipe.best_score_,pipe,preds,ys
+		
 		else:
 			return c,pipe.best_score_,pipe
 
