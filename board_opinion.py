@@ -115,11 +115,6 @@ class board_opinion(object):
 		dim_red = self.dim_red[dim_red_name]
 		dim_red,dim_red_params = dim_red[0], dim_red[1]
 
-		# print(dim_red)
-		# print(norm)
-		# print(var)
-		# print(clf)
-
 		# cachedir = mkdtemp()
 		# memory = Memory(cachedir=cachedir, verbose=0)
 		#Define pipeline
@@ -256,4 +251,8 @@ class board_opinion(object):
 		
 		return x
 	
+	def get_ordered_names(self):
+
+		return sorted(self.opinions_algos.keys())
+
 #
