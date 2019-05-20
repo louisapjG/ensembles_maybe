@@ -1,8 +1,3 @@
-"""
-Louis Gobin
-Mixed Group Scores implementation. For references.
-Setting stage for a MGR (mixed group ranks) implementation
-"""
 import itertools
 import numpy as np
 from sklearn.metrics import accuracy_score
@@ -42,11 +37,12 @@ class MGS(object):
 		return box.fit(Xs, y, performances)
 	
 	def predict_proba(self, Xs):
+
 		return np.sum([box.predict_proba(Xs) for box in self.boxes],axis = 0) / len(self.boxes)
 """
 BOX
 fit:
-	RAssign ranks of each input performance. HIGHER IS BETTER
+	Assign ranks of each input performance. HIGHER IS BETTER
 	Apply weights to each set of scores: normalize by dividing by highest weight
 	Create all combinations of len nbr_clf_per_merge
 	Evaluate all combinations, select the best one. Remember it.
@@ -61,25 +57,25 @@ class BOX(object):
 		self.best_combination_index = None
 		self.best_weights = None
 
-	def fit(self, Xs, y, performances = np.array([])):#,nbr_clf_per_merge = 0):
-		# if(nbr_clf_per_merge != 0):
-		# 	self.nbr_clf_per_merge = nbr_clf_per_merge
+	def fit(self, Xs, y, performances = np.array([])):
 		if performances.shape[0] == 0:
 			#Assign ranks to incoming preds
 			performances = np.array([self.score_function(y,np.argmax(X,axis = 1)) for X in Xs])
 
+		if (self.nbr_clf_per_merge == 1):
+			#Only one element mix, get best from performances
+			self.best_combination_index = [np.argmax(performances)]
+			self.best_weights = [1]
+			return self
+		
 		#Create all combinations of len nbr_clf_per_merge
 		combination_indexes = itertools.combinations(list([a for a in range(Xs.shape[0])]),self.nbr_clf_per_merge)
 		best = 0.
+		#print(len(list(combination_indexes)),performances.shape)
 		for combination_index in combination_indexes:
 			sub_Xs = Xs[combination_index,:,:]
 			sub_perf = performances[np.array(combination_index)]
 			#Sort small to high and assign weights from len to 1
-			if (len(combination_index) == 1):
-				#Only one element mix, get best from performances
-				self.best_combination_index = list(combination_indexes)[np.argmax(performances)]
-				self.best_weights = [1]
-				break
 			weights = len(sub_perf)+1 - rankdata(sub_perf)
 				
 			#Apply weights and normalize
