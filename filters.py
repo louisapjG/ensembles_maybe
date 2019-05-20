@@ -23,6 +23,10 @@ class perf_filter(object):
 
 		return preds[self.ranked_args[:nbr_to_filter]]
 
+	def filter_args(self,nbr_to_filter = 3):
+
+		return self.ranked_args[:nbr_to_filter]
+
 
 @jit(nopython = True)
 def calc_cognitive_diversity_matrix(ordered_preds, matrix, nbr_clf, nbr_events):
@@ -34,9 +38,10 @@ def calc_cognitive_diversity_matrix(ordered_preds, matrix, nbr_clf, nbr_events):
 			for i in range(nbr_events):
 				d = d + (ordered_preds[ind1,i] - ordered_preds[ind2,i])**2
 			matrix[ind1,ind2] = (d/nbr_events)**(1/2)
+
 #Filter inputs based on Cognitive diversity Strength
 class cds_simple_filter(object):
-	def __init__(self, performance_function):
+	def __init__(self, performance_function = None):
 
 		self.ranked_args = np.array([])
 
@@ -49,6 +54,10 @@ class cds_simple_filter(object):
 	def filter(self, preds, nbr_to_filter = 3):
 
 		return preds[self.ranked_args[:nbr_to_filter]]
+
+	def filter_args(self,nbr_to_filter = 3):
+
+		return self.ranked_args[:nbr_to_filter]
 
 	#NEED TO RECEIVE ONE VALUE PER CLF PER EVENT (no 3d but 2d matrix)
 	def cognitive_diversity_matrix(self,preds):
@@ -81,6 +90,10 @@ class cds_filter(cds_simple_filter):
 	def filter(self, preds, nbr_to_filter = 3):
 
 		return preds[self.ranked_args[:nbr_to_filter]]
+
+	def filter_args(self,nbr_to_filter = 3):
+
+		return self.ranked_args[:nbr_to_filter]
 
 #Filter inputs based on Cognitive diversity Strength and performance simultanously
 class ruler_filter(object):
@@ -124,7 +137,9 @@ class ruler_filter(object):
 
 		return preds[self.ranked_args[:nbr_to_filter]]
 
+	def filter_args(self,nbr_to_filter = 3):
 
+		return self.ranked_args[:nbr_to_filter]
 
 
 
