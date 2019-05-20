@@ -143,11 +143,11 @@ def run_board_ensemble(X,y, dic_params_board, time_serie = False, n_splits = 5, 
 			
 			#MGS
 			#print("MGS")
-			# mgs = MGS(score_function = performance, n_jobs = -1)
-			# mgs = mgs.fit(train_preds_filtered, y_trained)
-			# pred = mgs.predict_proba(preds_filtered)
-			# mgs_preds[filter_name].extend(np.argmax(pred, axis = 1).tolist())
-			# mgs_time = datetime.now()
+			mgs = MGS(score_function = performance, n_jobs = 1)
+			mgs = mgs.fit(train_preds_filtered, y_trained)
+			pred = mgs.predict_proba(preds_filtered)
+			mgs_preds[filter_name].extend(np.argmax(pred, axis = 1).tolist())
+			mgs_time = datetime.now()
 			#print("mgs",mgs_time - clf_time)
 
 			#MAJ VOTING
@@ -187,15 +187,34 @@ def run_board_ensemble(X,y, dic_params_board, time_serie = False, n_splits = 5, 
 			# #Select the best clf at training
 			# pred = np.argmax(filt2.filter(pred, nbr_to_filter = 1)[0], axis = 1)
 			# clf2_preds[filter_name].extend(pred.tolist())
-
+	y_of_preds = np.array(y_of_preds)
+	best_clf = np.array(best_clf)
 	ensemble_acc_dic["BestClf"] = performance(y_of_preds,best_clf)
 	for filter_name in mgs_preds:
-		# ensemble_acc_dic["MGS_"+filter_name] = performance(y_of_preds, mgs_preds[filter_name])
+		ensemble_acc_dic["MGS_"+filter_name] = performance(y_of_preds, mgs_preds[filter_name])
 		ensemble_acc_dic["MajVoting_"+filter_name] = performance(y_of_preds, maj_vote_preds[filter_name])
 		ensemble_acc_dic["RF_"+filter_name] = performance(y_of_preds, rf_preds[filter_name])
 		# ensemble_acc_dic["BestClf2_"+filter_name] =  performance(y_of_preds, clf2_preds[filter_name])
 
 	clfs_acc = np.array([performance(y_of_preds, pred) for pred in clfs_preds])
+	
+	best_clf_ind = filters_dico["perf"].filter_args(nbr_to_filter = 1)[0]
+	print("Best clf", board.get_ordered_names()[best_clf_ind])
+	print(confusion_matrix(y_of_preds, best_clf))
+	print(precision_score(y_of_preds,best_clf))
+	print()
+	print("MGS")
+	print(confusion_matrix(y_of_preds, mgs_preds["ruler"]))
+	print(precision_score(y_of_preds,mgs_preds["ruler"]))
+	print()
+	print("MajVoting_perf")
+	print(confusion_matrix(y_of_preds, maj_vote_preds["perf"]))
+	print(precision_score(y_of_preds,maj_vote_preds["perf"]))
+	print()
+	print("RandomForest")
+	print(confusion_matrix(y_of_preds, rf_preds["ruler"]))
+	print(precision_score(y_of_preds,rf_preds["ruler"]))
+	print('-------------------------\n')
 
 	return clfs_acc, ensemble_acc_dic
 
@@ -248,12 +267,12 @@ def import_data(path):
 	return df, df_target
 
 def main():
-	nbr_iterations = 1
-	n_splits = 3
+	nbr_iterations = 3
+	n_splits = 5
 	nbr_train_test_split = 5
-	nbr_to_filter = 12
+	nbr_to_filter = 8
 
-	performance = accuracy_score # precision_score
+	performance = precision_score # accuracy_score # 
 	output_file_name = "stats_results_wayfair.txt"#"stats_results_iris.txt" # 
 	#Get data
 	X, y_two = import_data("applications/df_training_scholarjet.csv")
@@ -266,65 +285,41 @@ def main():
 	dic_params_board = {
 		#List of variability cleanups methods
 		"variabilities" : {
-							"var" : (VarianceThreshold(),{'threshold':[.9*0.1,0.]}),
+							"var" : (VarianceThreshold(),{'threshold':[.8*.2,.9*0.1,0.]}),
 							#(None,None),
 						},
 
 		#List of Normalizations methods
-		# "normalizations" : [
-		# 						(MinMaxScaler(),{'feature_range':[(0, 1)]}),
-		# 						#(None,None),
-		# 					],
 		"normalizations" : {
 								"minmax" : (MinMaxScaler(),{'feature_range':[(0, 1)]}),
 								#(None,None),
 							},
 		
 		#List of Dimensions reduction methods
-		# "dim_red" : [
-		# 				(PCA(),{'n_components':[0.25,0.1]}),
-		# 				#(FeatureAgglomeration(),{'n_clusters':[30,10]}),
-		# 				#(KMeans(),{'n_clusters':[10,30]}),
-		# 				#(None,None),
-		# 			],
 		"dim_red" : {
 						"PCA" : (PCA(),{'n_components':[0.25,0.1]}),
-						#(FeatureAgglomeration(),{'n_clusters':[30,10]}),
-						#(KMeans(),{'n_clusters':[10,30]}),
+						# (FeatureAgglomeration(),{'n_clusters':[30,10]}),
+						"Kmeans_cluster" : (KMeans(),{'n_clusters':[10,30]}),
 						#(None,None),
 					},
 
 		#List of clf
-		# "clf_params" : [(svm.SVC(probability=True),{'C': [1], 'gamma': [0.7], 'kernel': ['rbf']}),
-		# 				(svm.SVC(probability=True),{'C':[1e-1, 1, 1e1],'kernel':['linear']}),
-		# 				# (ensemble.RandomForestClassifier(),{'n_estimators':[300]}),
-		# 				# (ensemble.AdaBoostClassifier(),{'base_estimator':[ensemble.RandomForestClassifier(n_estimators = 150),],'n_estimators':[100]}),
-		# 				#(tree.DecisionTreeClassifier(),{'criterion':["gini"]}),	
-		# 				#(neighbors.KNeighborsClassifier(),{'n_neighbors':[7]}),
-		# 				#MCONSUMPTION ON LARGET SETS(gaussian_process.GaussianProcessClassifier(),[{'random_state':[3]}]),
-		# 				# (ensemble.GradientBoostingClassifier(),{'loss':['deviance'],'n_estimators':[200,100,300],'max_depth':[2,4,6]}),
-		# 				# (ensemble.ExtraTreesClassifier(),{'n_estimators':[50,100,200,300]}),
-		# 				##(naive_bayes.GaussianNB(),[{'priors':[None]}]),
-		# 				#Linear classifier
-		# 				#Naive Bayes
-		# 				#Decision tree
-		# 				],
 		"clf_params" : {"svm_rbf":(svm.SVC(probability=True),{'C': [1], 'gamma': [0.7], 'kernel': ['rbf']}),
 						"svm_linear":(svm.SVC(probability=True),{'C':[1e-1, 1, 1e1],'kernel':['linear']}),
-						# (ensemble.RandomForestClassifier(),{'n_estimators':[300]}),
-						# (ensemble.AdaBoostClassifier(),{'base_estimator':[ensemble.RandomForestClassifier(n_estimators = 150),],'n_estimators':[100]}),
+						"RF":(ensemble.RandomForestClassifier(),{'n_estimators':[300]}),
+						"ABC":(ensemble.AdaBoostClassifier(),{'base_estimator':[ensemble.RandomForestClassifier(n_estimators = 150),],'n_estimators':[100]}),
 						#(tree.DecisionTreeClassifier(),{'criterion':["gini"]}),	
 						#(neighbors.KNeighborsClassifier(),{'n_neighbors':[7]}),
 						#MCONSUMPTION ON LARGET SETS(gaussian_process.GaussianProcessClassifier(),[{'random_state':[3]}]),
-						# (ensemble.GradientBoostingClassifier(),{'loss':['deviance'],'n_estimators':[200,100,300],'max_depth':[2,4,6]}),
-						# (ensemble.ExtraTreesClassifier(),{'n_estimators':[50,100,200,300]}),
+						"GBC" : (ensemble.GradientBoostingClassifier(),{'loss':['deviance'],'n_estimators':[200,100,300],'max_depth':[2,4,6]}),
+						"Extra_tree" : (ensemble.ExtraTreesClassifier(),{'n_estimators':[50,100,200,300]}),
 						##(naive_bayes.GaussianNB(),[{'priors':[None]}]),
 						#Linear classifier
 						#Naive Bayes
 						#Decision tree
 						},
 		#n_jobs
-		"n_jobs" : -1
+		"n_jobs" : -2
 	}
 	
 	ensembles_results = {}
